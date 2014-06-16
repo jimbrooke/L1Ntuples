@@ -11,7 +11,7 @@ Implementation:
      
 */
 //
-// Original Author:  Alex Tapper
+// Original Author:  
 //         Created:  
 // $Id: L1UpgradeTreeProducer.cc,v 1.8 2012/08/29 12:44:03 jbrooke Exp $
 //
@@ -30,24 +30,18 @@ Implementation:
 #include "FWCore/MessageLogger/interface/MessageLogger.h"
 
 // data formats
-#include "DataFormats/L1Trigger/interface/L1EmParticleFwd.h"
-#include "DataFormats/L1Trigger/interface/L1EmParticle.h"
-#include "DataFormats/L1Trigger/interface/L1JetParticleFwd.h"
-#include "DataFormats/L1Trigger/interface/L1JetParticle.h"
-#include "DataFormats/L1Trigger/interface/L1MuonParticleFwd.h"
-#include "DataFormats/L1Trigger/interface/L1MuonParticle.h"
-#include "DataFormats/L1Trigger/interface/L1EtMissParticleFwd.h"
-#include "DataFormats/L1Trigger/interface/L1EtMissParticle.h"
-#include "DataFormats/L1Trigger/interface/L1HFRingsFwd.h"
-#include "DataFormats/L1Trigger/interface/L1HFRings.h"
-#include "DataFormats/L1GlobalTrigger/interface/L1GlobalTriggerReadoutRecord.h"
+#include "DataFormats/L1Trigger/interface/EGamma.h"
+#include "DataFormats/L1Trigger/interface/Tau.h"
+#include "DataFormats/L1Trigger/interface/Jet.h"
+#include "DataFormats/L1Trigger/interface/Muon.h"
+#include "DataFormats/L1Trigger/interface/EtSum.h"
 
 // ROOT output stuff
 #include "FWCore/ServiceRegistry/interface/Service.h"
 #include "CommonTools/UtilAlgos/interface/TFileService.h"
 #include "TTree.h"
 
-#include "L1TriggerDPG/L1Ntuples/interface/L1AnalysisL1Extra.h"
+#include "L1TriggerDPG/L1Ntuples/interface/L1AnalysisL1Upgrade.h"
 
 //
 // class declaration
@@ -66,8 +60,8 @@ private:
 
 public:
   
-  L1Analysis::L1AnalysisL1Upgrade* l1Extra;
-  L1Analysis::L1AnalysisL1UpgradeDataFormat * l1ExtraData;
+  L1Analysis::L1AnalysisL1Upgrade* l1Upgrade;
+  L1Analysis::L1AnalysisL1UpgradeDataFormat * l1UpgradeData;
 
 private:
 
@@ -80,52 +74,32 @@ private:
   TTree * tree_;
  
   // EDM input tags
-  edm::InputTag nonIsoEmLabel_;
-  edm::InputTag isoEmLabel_;
-  edm::InputTag tauJetLabel_;
-  edm::InputTag cenJetLabel_;
-  edm::InputTag fwdJetLabel_;
-  edm::InputTag muonLabel_;
-  edm::InputTag metLabel_;
-  edm::InputTag mhtLabel_;
-  edm::InputTag hfRingsLabel_;
-
-  bool doUpgrade_;
+  edm::InputTag egLabel_;
   edm::InputTag tauLabel_;
-  edm::InputTag isoTauLabel_;
+  edm::InputTag jetLabel_;
+  edm::InputTag sumLabel_;
+  edm::InputTag muonLabel_;
 
 };
 
 
 
 L1UpgradeTreeProducer::L1UpgradeTreeProducer(const edm::ParameterSet& iConfig):
-  nonIsoEmLabel_(iConfig.getUntrackedParameter("nonIsoEmLabel",edm::InputTag("l\
-1extraParticles:NonIsolated"))),
-  isoEmLabel_(iConfig.getUntrackedParameter("isoEmLabel",edm::InputTag("l\
-1extraParticles:Isolated"))),
-  tauJetLabel_(iConfig.getUntrackedParameter("tauJetLabel",edm::InputTag("l\
-1extraParticles:Tau"))),
-  cenJetLabel_(iConfig.getUntrackedParameter("cenJetLabel",edm::InputTag("l\
-1extraParticles:Central"))),
-  fwdJetLabel_(iConfig.getUntrackedParameter("fwdJetLabel",edm::InputTag("l\
-1extraParticles:Forward"))),
-  muonLabel_(iConfig.getUntrackedParameter("muonLabel",edm::InputTag("l\
-1extraParticles"))),
-  metLabel_(iConfig.getUntrackedParameter("metLabel",edm::InputTag("l\
-1extraParticles:MET"))),
-  mhtLabel_(iConfig.getUntrackedParameter("mhtLabel",edm::InputTag("l\
-1extraParticles:MHT"))),
-  hfRingsLabel_(iConfig.getUntrackedParameter("hfRingsLabel",edm::InputTag("l1extraParticles")))
+  egLabel_(iConfig.getUntrackedParameter("egLabel",edm::InputTag("caloStage2Digis"))),
+  tauLabel_(iConfig.getUntrackedParameter("tauLabel",edm::InputTag("caloStage2Digis"))),
+  jetLabel_(iConfig.getUntrackedParameter("jetLabel",edm::InputTag("caloStage2Digis"))),
+  sumLabel_(iConfig.getUntrackedParameter("sumLabel",edm::InputTag("caloStage2Digis"))),
+  muonLabel_(iConfig.getUntrackedParameter("muonLabel",edm::InputTag("")))
 {
  
   maxL1Upgrade_ = iConfig.getParameter<unsigned int>("maxL1Upgrade");
  
-  l1Extra     = new L1Analysis::L1AnalysisL1Upgrade();
-  l1ExtraData = l1Extra->getData();
+  l1Upgrade     = new L1Analysis::L1AnalysisL1Upgrade();
+  l1UpgradeData = l1Upgrade->getData();
   
   // set up output
   tree_=fs_->make<TTree>("L1UpgradeTree", "L1UpgradeTree");
-  tree_->Branch("L1Upgrade", "L1Analysis::L1AnalysisL1UpgradeDataFormat", &l1ExtraData, 32000, 3);
+  tree_->Branch("L1Upgrade", "L1Analysis::L1AnalysisL1UpgradeDataFormat", &l1UpgradeData, 32000, 3);
 
 }
 
@@ -148,80 +122,48 @@ void
 L1UpgradeTreeProducer::analyze(const edm::Event& iEvent, const edm::EventSetup& iSetup)
 {
   
-  l1Extra->Reset();
+  l1Upgrade->Reset();
 
-  edm::Handle<l1extra::L1EmParticleCollection> isoEm;
-  edm::Handle<l1extra::L1EmParticleCollection> nonIsoEm;
-  edm::Handle<l1extra::L1JetParticleCollection> cenJet;
-  edm::Handle<l1extra::L1JetParticleCollection> fwdJet;
-  edm::Handle<l1extra::L1JetParticleCollection> tauJet;
-  edm::Handle<l1extra::L1MuonParticleCollection> muon; ;
-  edm::Handle<l1extra::L1EtMissParticleCollection> mets;
-  edm::Handle<l1extra::L1EtMissParticleCollection> mhts;
-  edm::Handle<l1extra::L1HFRingsCollection> hfRings ;
+  edm::Handle<l1t::EGammaBxCollection> eg;
+  edm::Handle<l1t::TauBxCollection> tau;
+  edm::Handle<l1t::JetBxCollection> jet;
+  edm::Handle<l1t::EtSumBxCollection> sums;
+  edm::Handle<l1t::MuonBxCollection> muon; ;
 
-  iEvent.getByLabel(nonIsoEmLabel_, nonIsoEm);
-  iEvent.getByLabel(isoEmLabel_, isoEm);
-  iEvent.getByLabel(tauJetLabel_, tauJet);
-  iEvent.getByLabel(cenJetLabel_, cenJet);
-  iEvent.getByLabel(fwdJetLabel_, fwdJet);
+  iEvent.getByLabel(egLabel_,   eg);
+  iEvent.getByLabel(tauLabel_,  tau);
+  iEvent.getByLabel(jetLabel_,  jet);
+  iEvent.getByLabel(sumLabel_, sums);
   iEvent.getByLabel(muonLabel_, muon);
-  iEvent.getByLabel(metLabel_, mets);
-  iEvent.getByLabel(mhtLabel_, mhts);
-  iEvent.getByLabel(hfRingsLabel_, hfRings);
 
-  if (isoEm.isValid()){ 
-    l1Extra->SetIsoEm(isoEm, maxL1Upgrade_);
+  if (eg.isValid()){ 
+    l1Upgrade->SetEm(eg, maxL1Upgrade_);
   } else {
-    edm::LogWarning("MissingProduct") << "L1Upgrade Iso Em not found. Branch will not be filled" << std::endl;
+    edm::LogWarning("MissingProduct") << "L1Upgrade Em not found. Branch will not be filled" << std::endl;
   }
 
-  if (nonIsoEm.isValid()){ 
-    l1Extra->SetNonIsoEm(nonIsoEm, maxL1Upgrade_);
+  if (tau.isValid()){ 
+    l1Upgrade->SetTau(tau, maxL1Upgrade_);
   } else {
-    edm::LogWarning("MissingProduct") << "L1Upgrade Non Iso Em not found. Branch will not be filled" << std::endl;
+    edm::LogWarning("MissingProduct") << "L1Upgrade Tau not found. Branch will not be filled" << std::endl;
   }
 
-  if (cenJet.isValid()){ 
-    l1Extra->SetCenJet(cenJet, maxL1Upgrade_);
+  if (jet.isValid()){ 
+    l1Upgrade->SetJet(jet, maxL1Upgrade_);
   } else {
-    edm::LogWarning("MissingProduct") << "L1Upgrade Central Jets not found. Branch will not be filled" << std::endl;
+    edm::LogWarning("MissingProduct") << "L1Upgrade Jets not found. Branch will not be filled" << std::endl;
   }
 
-  if (tauJet.isValid()){ 
-    l1Extra->SetTauJet(tauJet, maxL1Upgrade_);
+  if (sums.isValid()){ 
+    l1Upgrade->SetSum(sums, maxL1Upgrade_);  
   } else {
-    edm::LogWarning("MissingProduct") << "L1Upgrade Tau Jets not found. Branch will not be filled" << std::endl;
-  }
-
-  if (fwdJet.isValid()){ 
-    l1Extra->SetFwdJet(fwdJet, maxL1Upgrade_);
-  } else {
-    edm::LogWarning("MissingProduct") << "L1Upgrade Forward Jets not found. Branch will not be filled" << std::endl;
+    edm::LogWarning("MissingProduct") << "L1Upgrade EtSums not found. Branch will not be filled" << std::endl;
   }
 
   if (muon.isValid()){ 
-    l1Extra->SetMuon(muon, maxL1Upgrade_);
+    l1Upgrade->SetMuon(muon, maxL1Upgrade_);
   } else {
     edm::LogWarning("MissingProduct") << "L1Upgrade Muons not found. Branch will not be filled" << std::endl;
-  }
-
-  if (mets.isValid()){ 
-    l1Extra->SetMet(mets);
-  } else {
-    edm::LogWarning("MissingProduct") << "L1Upgrade MET not found. Branch will not be filled" << std::endl;
-  }
-
-  if (mhts.isValid()){ 
-    l1Extra->SetMht(mhts);  
-  } else {
-    edm::LogWarning("MissingProduct") << "L1Upgrade MHT not found. Branch will not be filled" << std::endl;
-  }
-
-  if (hfRings.isValid()){ 
-    l1Extra->SetHFring(hfRings);  
-  } else {
-    edm::LogWarning("MissingProduct") << "L1Upgrade HF Rings not found. Branch will not be filled" << std::endl;
   }
 
   tree_->Fill();
