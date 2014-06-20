@@ -10,6 +10,7 @@
 <class name="L1Analysis::L1AnalysisGeneratorDataFormat"/>
 <class name="L1Analysis::L1AnalysisSimulationDataFormat"/>
 <class name="L1Analysis::L1AnalysisL1ExtraDataFormat"/>
+<class name="L1Analysis::L1AnalysisL1UpgradeDataFormat"/>
 <class name="L1Analysis::L1AnalysisRecoMuonDataFormat"/>
 <class name="L1Analysis::L1AnalysisRecoRpcHitDataFormat"/>
 <class name="L1Analysis::L1AnalysisRecoJetDataFormat"/>
